@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  prompt2peptide:
+    build: .
+    container_name: prompt2peptide
+    volumes:
+      - ./results:/app/results
+      - ./figures:/app/figures
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=""
+    command: python reproduce.py
+    
+  jupyter:
+    build: .
+    container_name: prompt2peptide-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
