@@ -180,10 +180,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Contact
 
 - **Author**: Aayam Bansal
-- **Email**: [your-email@domain.com]
-- **GitHub**: [@yourusername](https://github.com/yourusername)
+- **Email**: [aayambansal@gmail.com]
+- **GitHub**: [@aayambansal](https://github.com/aayambansal)
 
 ---
-
-**Status**: Ready for paper submission to NeurIPS 2025  
-**Last Updated**: September 2024
+  
+**Last Updated**: September 2025
