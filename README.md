@@ -24,7 +24,7 @@ Prompt2Peptide is a novel framework for controllable peptide generation that com
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/Prompt2Peptide.git
+git clone https://github.com/aayambansal/Prompt2Peptide.git
 cd Prompt2Peptide
 pip install -r requirements.txt
 ```
