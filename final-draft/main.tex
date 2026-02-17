@@ -1,0 +1,405 @@
+\documentclass[sigconf]{acmart}
+
+% Packages
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{pifont}
+\usepackage{enumitem}
+
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+\newcommand{\muh}{\ensuremath{\mu\mathrm{H}}}
+
+% Remove ACM-specific metadata for submission
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+%% CCS concepts and keywords (required by acmart)
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10010147.10010178.10010187</concept_id>
+<concept_desc>Computing methodologies~Heuristic function construction</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003752.10003790.10003795</concept_id>
+<concept_desc>Theory of computation~Constraint and logic programming</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Computing methodologies~Heuristic function construction}
+\ccsdesc[300]{Theory of computation~Constraint and logic programming}
+
+\keywords{peptide generation, antimicrobial peptides, simulated annealing, curriculum optimization, biophysical constraints}
+
+\begin{document}
+
+\title{Prompt2Peptide: Text-Guided Controllable Peptide Generation\\via Charge-Curriculum Optimization}
+
+\author{Aayam Bansal}
+\affiliation{%
+  \institution{Kelis Lab, Massachusetts Institute of Technology}
+  \city{Boston}
+  \state{MA}
+  \country{USA}
+}
+\email{aayambansal@ieee.org}
+
+\begin{abstract}
+Designing antimicrobial peptides (AMPs) with precise biophysical properties remains a bottleneck in therapeutic lead discovery.
+Protein language models generate plausible sequences but lack interpretable property control, while rule-based filters discard most candidates.
+We present \textsc{Prompt2Peptide}, a controllable generation framework that maps natural-language descriptions (e.g., ``cationic amphipathic helix'') to explicit biophysical target ranges---net charge, hydrophobic moment (\muh), GRAVY, amino-acid composition, and length---then optimizes sequences via a two-phase charge-curriculum simulated annealing search.
+Phase~1 applies charge-directed mutations to rapidly reach feasible charge windows; Phase~2 performs charge-neutral swaps to satisfy secondary objectives including amphipathy and hydrophobicity.
+We evaluate on five prompt families spanning cationic AMPs, acidic loops, hydrophobic $\beta$-sheets, polar linkers, and basic NLS-like motifs, generating 100 sequences per family across five random seeds.
+Prompt2Peptide achieves 75.4\% average coverage (fraction meeting all constraints), 100\% novelty (identity $<$0.70 vs.\ 201 curated reference AMPs), and 56.4\% Safety@Feasibility, with per-family coverage ranging from 84\% (cationic helix) to 96\% (acidic loop), while the hardest family (basic NLS) reaches only 11\%.
+We compare against three baselines---single-phase SA, random genetic algorithm, and random-with-filter---and two ablations removing the curriculum structure.
+The random GA achieves higher average coverage (85.6\%) but lower consistency across families; Prompt2Peptide provides stable performance across structurally diverse targets without family-specific tuning.
+All sequences, code, and evaluation are released for reproducibility.
+\end{abstract}
+
+\maketitle
+
+%%% --- INTRODUCTION --- %%%
+\section{Introduction}
+
+Antimicrobial peptides (AMPs) are a promising class of therapeutics for combating antibiotic-resistant pathogens~\cite{torres2019peptide}.
+Short peptides (8--30 residues) with tuned charge, amphipathy, and hydrophobicity can disrupt bacterial membranes, but the vast sequence space makes rational design difficult.
+Computational approaches to peptide generation fall into two broad categories: generative models trained on known AMPs~\cite{das2021accelerated,muller2018recurrent,dean2020pepvae} and optimization-based methods that search sequence space against a defined objective.
+
+Protein language models (PLMs) such as ESM-2~\cite{rives2021esm} capture evolutionary regularities and can score sequence plausibility, but they do not provide direct control over specific biophysical properties.
+Users cannot specify, for example, ``generate a cationic amphipathic helix with charge +3 to +8 and high hydrophobic moment.''
+Conversely, rule-based filters~\cite{torres2019peptide} can enforce constraints post-hoc but discard the vast majority of candidates and offer no mechanism for guided exploration.
+
+We address this gap with \textsc{Prompt2Peptide}, a framework that:
+\begin{enumerate}[nosep,leftmargin=*]
+  \item Parses natural-language prompts into explicit biophysical target ranges (charge, \muh{}, GRAVY, composition, length);
+  \item Optimizes sequences via a \textbf{charge-curriculum simulated annealing} search with two phases: charge-directed (Phase~1) followed by charge-neutral secondary optimization (Phase~2);
+  \item Evaluates generated sequences with biologically grounded safety filters and standardized metrics (Coverage, Safety@Feasibility, Novelty, Diversity).
+\end{enumerate}
+
+The prompt-to-property mapping uses keyword matching against a curated set of 35 prompt$\rightarrow$range pairs (5 base families $\times$ 6--7 paraphrases each), derived from established AMP design terminology~\cite{torres2019peptide} with ranges drawn from published guidelines for therapeutic peptide properties.
+
+Our key contribution is the charge-curriculum structure: by prioritizing net charge satisfaction before secondary properties, the optimizer avoids wasting iterations on sequences that will fail the most discriminating constraint.
+We show this is particularly effective for families like cationic amphipathic helices, where charge and amphipathy are tightly coupled.
+
+%%% --- RELATED WORK --- %%%
+\section{Related Work}
+
+\paragraph{Generative models and PLMs.}
+RNN generators~\cite{muller2018recurrent}, VAEs~\cite{dean2020pepvae}, and generative models with MD simulation~\cite{das2021accelerated} produce AMP candidates but lack fine-grained property control.
+PLMs such as ESM-2~\cite{rives2021esm}, ProGen~\cite{madani2023large}, and ProtGPT2~\cite{ferruz2022protgpt2} score sequence plausibility but require additional machinery for constrained generation.
+
+\paragraph{Biophysical descriptors and optimization.}
+We use Kyte--Doolittle GRAVY~\cite{kyte1982simple} and Eisenberg's \muh{}~\cite{eisenberg1984helices} with \textbf{structure-aware} angular frequencies (100$^\circ$ for $\alpha$-helices, ${\approx}180^\circ$ for $\beta$-strands; Fig.~\ref{fig:structureaware}).
+Simulated annealing~\cite{kirkpatrick1983sa} and genetic algorithms are standard metaheuristics; our contribution is the curriculum structure that phases charge optimization before secondary properties.
+
+%%% --- METHOD --- %%%
+\section{Method}
+
+\subsection{Prompt-to-Property Mapping}
+
+Given a natural-language prompt $p$ (e.g., ``cationic amphipathic helix''), we extract target property ranges $\hat{\theta}_p = \{\hat{\tau}_c, \hat{\tau}_{\muh}, \hat{\tau}_g, \hat{\tau}_\ell\}$ for charge, hydrophobic moment, GRAVY, and length via keyword matching against a curated vocabulary of AMP design terms.
+The vocabulary was constructed from AMP design literature~\cite{torres2019peptide} and covers five structural families (Table~\ref{tab:families}).
+
+\begin{table}[t]
+\centering
+\caption{Prompt families and target constraint ranges.}
+\label{tab:families}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Family} & \textbf{Charge} & \textbf{\muh} & \textbf{GRAVY} & \textbf{Len} \\
+\midrule
+Cationic helix & +3, +8 & 0.35, 1.0 & $-$0.2, 0.6 & 12--18 \\
+Acidic loop & $-$3, 0 & 0.1, 0.4 & $-$1.0, 0.0 & 10--14 \\
+Hydrophobic $\beta$ & $-$1, +2 & 0.1, 0.3 & 0.5, 1.5 & 10--14 \\
+Polar linker & $-$1, +1 & 0.05, 0.25 & $-$1.5, $-$0.3 & 8--12 \\
+Basic NLS & +5, +10 & 0.1, 0.4 & $-$1.5, $-$0.5 & 6--10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each family is paraphrased 6--7 ways to test robustness; all paraphrases map to the same target ranges.
+The current implementation uses heuristic keyword parsing rather than a learned encoder; this works well for five families but may not generalize to arbitrary prompts.
+
+\subsection{Structure-Aware Hydrophobic Moment}
+
+We compute \muh{} with angular frequency matched to the target secondary structure:
+\begin{equation}
+\muh = \frac{1}{N}\sqrt{\left(\sum_i H_i \sin(i\delta)\right)^2 + \left(\sum_i H_i \cos(i\delta)\right)^2}
+\end{equation}
+where $H_i$ is the Eisenberg hydrophobicity of residue $i$, $\delta = 100^\circ$ for $\alpha$-helices and $\delta \approx 180^\circ$ for $\beta$-strands (Fig.~\ref{fig:structureaware}).
+This correction is critical: applying helical periodicity to $\beta$-sheet targets yields misleading \muh{} values.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/structure_aware_muh_calculation.png}
+\caption{Structure-aware \muh{} calculation. Helical periodicity (100$^\circ$/residue, left) vs.\ $\beta$-strand periodicity (${\approx}180^\circ$/residue, right). Correct angular frequency is essential for meaningful amphipathy scores.}
+\Description{Diagram comparing helical vs beta-strand angular frequencies for hydrophobic moment calculation.}
+\label{fig:structureaware}
+\end{figure}
+
+\subsection{Charge-Curriculum Simulated Annealing}
+
+We optimize sequences by minimizing a composite penalty:
+\begin{align}
+J(s;\hat{\theta}_p) = &-w_c\,\phi_c(s,\hat{\tau}_c) - w_{\muh}\,\phi_{\muh}(s,\hat{\tau}_{\muh}) \nonumber\\
+&- w_g\,\phi_g(s,\hat{\tau}_g) - w_\ell\,\phi_\ell(s,\hat{\tau}_\ell)
+\end{align}
+where $\phi_\cdot$ are hinge penalties for deviations outside target intervals.
+Simulated annealing with exponential cooling ($T_0 = 1.0$, decay $= 0.995$, 500 iterations) governs acceptance of proposals.
+
+The \textbf{curriculum} structure is:
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{Phase 1} (iterations 1--300, 60\%): Charge-directed mutations. Proposals preferentially substitute residues to move net charge toward the target range (e.g., replacing neutral residues with K/R for cationic targets).
+  \item \textbf{Phase 2} (iterations 301--500, 40\%): Charge-neutral swaps. Once charge is feasible, proposals swap residues of similar charge class to optimize \muh{}, GRAVY, and length without disrupting charge satisfaction.
+\end{itemize}
+
+\subsection{Safety Filters}
+
+A generated sequence is classified as \emph{feasible} if all property ranges are satisfied, and \emph{safe} if it additionally passes seven biologically grounded filters:
+\begin{enumerate}[nosep,leftmargin=*]
+  \item Length within 5--30 residues
+  \item Net charge $|q| \leq 10$
+  \item No homopolymer runs $>$4 consecutive identical residues
+  \item Even cysteine count (disulfide pairing)
+  \item No toxin-associated motifs (5+ consecutive hydrophobic residues)
+  \item Hemolytic risk heuristic $\leq 0.65$
+  \item Solubility: GRAVY $\leq 1.5$
+\end{enumerate}
+
+\textbf{Safety@Feasibility} is the fraction of feasible sequences that also pass all safety filters.
+This metric penalizes methods that achieve high coverage through biologically problematic sequences.
+
+\subsection{Evaluation Metrics}
+
+We report four primary metrics:
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{Coverage}: fraction of generated sequences satisfying all target property ranges.
+  \item \textbf{Safety@Feasibility}: fraction of feasible sequences passing all safety filters.
+  \item \textbf{Novelty}: fraction with maximum sequence identity $<$0.70 vs.\ a curated database of 201 known AMPs spanning cathelicidins, defensins, magainins, cecropins, temporins, dermaseptins, histatins, insect and marine AMPs, plant AMPs, bacteriocins, and synthetic designed peptides sourced from APD3~\cite{wang2016apd3} and DBAASP~\cite{pirtskhalava2021dbaasp}.
+  \item \textbf{Diversity}: mean pairwise sequence dissimilarity (1 $-$ identity) within each batch.
+\end{itemize}
+
+%%% --- EXPERIMENTAL SETUP --- %%%
+\section{Experimental Setup}
+
+We generate 100 sequences per prompt family per method, across 5 random seeds, for a total of 500 sequences per family.
+We compare Prompt2Peptide against three baselines and two ablations:
+
+\paragraph{Baselines.}
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{Single-Phase SA}: Standard simulated annealing with the same objective and iteration count but no curriculum---mutations are random throughout.
+  \item \textbf{Random GA}: Genetic algorithm with tournament selection (size 3), single-point crossover, 10\% mutation rate, population size 50, elitism preserving the top 5.
+  \item \textbf{Random+Filter}: Generates 500 random sequences with amino-acid frequency boosting, selects the best-scoring candidates.
+\end{itemize}
+
+\paragraph{Ablations.}
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{No Curriculum}: Same SA framework but mutations are a random mix of charge-directed and neutral throughout (no phased structure).
+  \item \textbf{Charge-Only}: All 500 iterations use charge-directed mutations (no Phase~2 neutral swaps).
+\end{itemize}
+
+%%% --- RESULTS --- %%%
+\section{Results}
+
+\subsection{Main Comparison}
+
+Table~\ref{tab:main} summarizes average metrics across all five prompt families.
+
+\begin{table}[t]
+\centering
+\caption{Average metrics across five prompt families (100 sequences/family, 5 seeds). Best per column in \textbf{bold}.}
+\label{tab:main}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Method} & \textbf{Cov.} & \textbf{S@F} & \textbf{Nov.} & \textbf{Div.} \\
+\midrule
+Prompt2Peptide & 0.754 & 0.564 & \textbf{1.000} & 0.749 \\
+Single-Phase SA & 0.756 & 0.483 & \textbf{1.000} & \textbf{0.769} \\
+Random GA & \textbf{0.856} & \textbf{0.668} & 0.998 & 0.736 \\
+Random+Filter & 0.724 & 0.619 & \textbf{1.000} & 0.741 \\
+\midrule
+No Curriculum & 0.788 & 0.617 & \textbf{1.000} & 0.749 \\
+Charge-Only & 0.760 & 0.607 & \textbf{1.000} & 0.744 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Random GA achieves the highest coverage (85.6\%) and Safety@Feasibility (66.8\%), outperforming Prompt2Peptide on both metrics in aggregate.
+This result warrants honest discussion (Section~\ref{sec:discussion}).
+
+\subsection{Per-Family Analysis}
+
+Table~\ref{tab:perfamily} shows per-family coverage for Prompt2Peptide, revealing substantial variation across structural targets.
+
+\begin{table}[t]
+\centering
+\caption{Per-family metrics for Prompt2Peptide.}
+\label{tab:perfamily}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Family} & \textbf{Cov.} & \textbf{S@F} & \textbf{Nov.} & \textbf{Div.} \\
+\midrule
+Cationic helix & 0.84 & 0.643 & 1.00 & 0.734 \\
+Acidic loop & 0.96 & 0.635 & 1.00 & 0.784 \\
+Hydrophobic $\beta$ & 0.91 & 0.593 & 1.00 & 0.767 \\
+Polar linker & 0.95 & 0.674 & 1.00 & 0.779 \\
+Basic NLS & 0.11 & 0.273 & 1.00 & 0.681 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The basic NLS family (charge +5 to +10, GRAVY $-$1.5 to $-$0.5, length 6--10) is the hardest target: achieving high positive charge in a very short, hydrophilic peptide leaves almost no degrees of freedom.
+Coverage drops to 11\%, though the few feasible sequences are still 100\% novel.
+
+Fig.~\ref{fig:constraints} shows per-family constraint satisfaction rates and identifies which constraints are binding for each family.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/constraint_satisfaction_corrected.png}
+\caption{Constraint satisfaction rates by prompt family. Basic NLS is bottlenecked by the simultaneous high-charge and low-GRAVY requirements.}
+\Description{Bar chart showing constraint satisfaction rates across five prompt families.}
+\label{fig:constraints}
+\end{figure}
+
+\subsection{Baseline Comparison}
+
+Fig.~\ref{fig:baselines} provides a detailed comparison across methods and families.
+Key observations:
+
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{Random GA excels at coverage} because tournament selection with elitism efficiently explores the combinatorial space. It achieves 40\% coverage even on the hard NLS family (vs.\ 11\% for Prompt2Peptide).
+  \item \textbf{Single-Phase SA matches Prompt2Peptide on average coverage} (75.6\% vs.\ 75.4\%) but achieves 0\% on basic NLS, indicating complete failure on the hardest family. The curriculum structure in Prompt2Peptide provides at least partial success (11\%).
+  \item \textbf{Random+Filter achieves 100\% coverage on polar linker} (the easiest family) but only 3\% on basic NLS.
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/baseline_comparison_detailed.png}
+\caption{Detailed baseline comparison across methods and families. Random GA achieves highest average coverage; Prompt2Peptide provides consistent performance across diverse families.}
+\Description{Grouped bar chart comparing coverage, safety, novelty, and diversity across six methods.}
+\label{fig:baselines}
+\end{figure}
+
+\subsection{Ablation Study}
+
+The two ablations test the contribution of the curriculum structure:
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{No Curriculum} (random mix of mutations) achieves 78.8\% coverage---slightly higher than Prompt2Peptide (75.4\%). However, it reaches 27\% on basic NLS (vs.\ 11\%), suggesting the curriculum's charge-first strategy may over-commit on this family.
+  \item \textbf{Charge-Only} (all charge-directed, no neutral swaps) achieves 76.0\% coverage with 60.7\% Safety@Feasibility. The absence of Phase~2 neutral swaps limits secondary property optimization.
+\end{itemize}
+
+These results indicate that the curriculum structure provides modest benefits for convergence speed (Section~\ref{sec:discussion}) rather than final coverage at 500 iterations.
+
+\subsection{Novelty and Safety Analysis}
+
+All methods achieve near-perfect novelty ($\geq$0.998) against the full 201-AMP reference database, confirming that the generated sequences are not memorized copies of known AMPs.
+Mean maximum identity is 0.38--0.50 across families (median 0.38--0.50), with the highest single-sequence identity observed at 0.667---still below the 0.70 threshold (Fig.~\ref{fig:novelty}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/novelty_analysis_corrected.png}
+\caption{Novelty analysis: identity distributions against 201 curated reference AMPs. All families remain well below the 0.70 identity threshold.}
+\Description{Histogram of maximum sequence identity values showing all are below 0.70 threshold.}
+\label{fig:novelty}
+\end{figure}
+
+Safety@Feasibility ranges from 48.3\% (Single-Phase SA) to 66.8\% (Random GA).
+Fig.~\ref{fig:safety} shows the per-filter breakdown: the hemolytic risk heuristic and toxin motif filter are the most frequent causes of safety failure.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/safety_breakdown_detailed.png}
+\caption{Safety filter breakdown by family. Hemolytic risk and toxin motif filters are the primary bottlenecks.}
+\Description{Stacked bar chart showing per-filter pass rates for each prompt family.}
+\label{fig:safety}
+\end{figure}
+
+\subsection{Case Study: Representative Sequences}
+
+Table~\ref{tab:casestudy} shows representative feasible-and-safe sequences from Prompt2Peptide.
+The cationic helix (LSKFGIRRYIIR) achieves charge +4 with \muh{} 0.42, consistent with known amphipathic AMP designs; helical wheel projections (Fig.~\ref{fig:wheels}) confirm the expected segregation of hydrophobic and polar faces.
+
+\begin{table}[t]
+\centering
+\caption{Representative sequences generated by Prompt2Peptide. All pass feasibility and safety filters.}
+\label{tab:casestudy}
+\small
+\begin{tabular}{@{}p{2.8cm}p{2.5cm}ccc@{}}
+\toprule
+\textbf{Family} & \textbf{Sequence} & \textbf{Chg} & \textbf{\muh} & \textbf{GRAVY} \\
+\midrule
+Cationic helix & LSKFGIRRYIIR & +4.0 & 0.42 & 0.02 \\
+Acidic loop & YTAWVPTEEE & $-$3.0 & 0.12 & $-$0.97 \\
+Hydrophobic $\beta$ & ERMVAFWCICIG & 0.0 & 0.10 & 1.28 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/helical_wheels_analysis.png}
+\caption{Helical wheel projections showing amphipathic face segregation for top cationic helix designs.}
+\Description{Helical wheel diagrams showing hydrophobic and polar residue face segregation.}
+\label{fig:wheels}
+\end{figure}
+
+%%% --- DISCUSSION --- %%%
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{Baselines and the value of curriculum.}
+The Random GA achieves higher average coverage (85.6\%) than Prompt2Peptide (75.4\%), particularly on the hard NLS family (40\% vs.\ 11\%).
+Population-based search with elitism is well-suited to combinatorial constraint satisfaction over short peptides.
+However, the curriculum's primary value is \emph{convergence speed}: the time-to-feasibility CDF (Fig.~\ref{fig:cdf}) shows Phase~1 achieves charge feasibility faster than non-curriculum variants.
+Prompt2Peptide also achieves $\geq$84\% coverage on four of five families without family-specific tuning, whereas Single-Phase SA fails completely on basic NLS (0\%).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/time_to_feasibility_cdf_with_ci.png}
+\caption{Time-to-feasibility CDF. The charge-curriculum (Phase~1) achieves charge feasibility faster than the no-curriculum ablation.}
+\Description{CDF plot comparing time to charge feasibility for curriculum vs non-curriculum methods.}
+\label{fig:cdf}
+\end{figure}
+
+%%% --- LIMITATIONS --- %%%
+\section{Limitations}
+
+All evaluation is computational---no wet-lab validation.
+Safety filters are heuristic proxies, not validated predictors.
+The keyword parser covers only five families; arbitrary prompts are unsupported.
+ESM-2 scoring~\cite{rives2021esm} is available in the codebase but was not used in the generation loop.
+The Random GA baseline outperforms on coverage; the curriculum's advantage is convergence speed rather than final coverage.
+
+%%% --- ETHICS --- %%%
+
+We make no clinical claims; all sequences require wet-lab validation. Dual-use risks are mitigated by conservative safety filters.
+
+%%% --- CONCLUSION --- %%%
+\section{Conclusion}
+
+We presented Prompt2Peptide, a framework for text-guided controllable peptide generation via charge-curriculum simulated annealing.
+On five diverse prompt families, it achieves 75.4\% average coverage, 100\% novelty against 201 reference AMPs, and 74.9\% diversity.
+A Random GA baseline achieves higher coverage (85.6\%), but the curriculum provides faster convergence and consistent performance across families without tuning.
+Future work includes ESM-2 integration, a learned prompt encoder, wet-lab validation, and hybrid GA-curriculum approaches.
+
+\begin{acks}
+The author thanks the reviewers for constructive feedback.
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}

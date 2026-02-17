@@ -1,0 +1,53 @@
+{
+  "reference_count": 201,
+  "threshold": 0.7,
+  "per_family": {
+    "cationic_amphipathic_helix": {
+      "n": 100,
+      "novelty_rate": 1.0,
+      "mean_identity": 0.4867193585968458,
+      "max_identity": 0.6666666666666666,
+      "median_identity": 0.4827586206896552,
+      "feasible_novelty": 1.0,
+      "feasible_mean_identity": 0.48231836010354606
+    },
+    "soluble_acidic_loop": {
+      "n": 100,
+      "novelty_rate": 1.0,
+      "mean_identity": 0.3812326450492638,
+      "max_identity": 0.5185185185185185,
+      "median_identity": 0.38461538461538464,
+      "feasible_novelty": 1.0,
+      "feasible_mean_identity": 0.3809694466298738
+    },
+    "hydrophobic_beta_sheet": {
+      "n": 100,
+      "novelty_rate": 1.0,
+      "mean_identity": 0.42736525075035287,
+      "max_identity": 0.6153846153846154,
+      "median_identity": 0.4166666666666667,
+      "feasible_novelty": 1.0,
+      "feasible_mean_identity": 0.4257860828143176
+    },
+    "polar_flexible_linker": {
+      "n": 100,
+      "novelty_rate": 1.0,
+      "mean_identity": 0.39540790763944683,
+      "max_identity": 0.56,
+      "median_identity": 0.38278388278388276,
+      "feasible_novelty": 1.0,
+      "feasible_mean_identity": 0.3943270238067425
+    },
+    "basic_nuclear_localization": {
+      "n": 100,
+      "novelty_rate": 1.0,
+      "mean_identity": 0.5013808160076223,
+      "max_identity": 0.6666666666666666,
+      "median_identity": 0.5,
+      "feasible_novelty": 1.0,
+      "feasible_mean_identity": 0.5099539848182105
+    }
+  },
+  "average_novelty": 1.0,
+  "average_mean_identity": 0.43842119560870624
+}

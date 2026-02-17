@@ -1,0 +1,31 @@
+Method,Family,Coverage,Safety@F,Novelty,Diversity,N
+Prompt2Peptide,cationic_amphipathic_helix,0.84,0.6428571428571429,1.0,0.7337507077095716,100
+Prompt2Peptide,soluble_acidic_loop,0.96,0.6354166666666666,1.0,0.783617421114493,100
+Prompt2Peptide,hydrophobic_beta_sheet,0.91,0.5934065934065934,1.0,0.7673961799480876,100
+Prompt2Peptide,polar_flexible_linker,0.95,0.6736842105263158,1.0,0.7790565699052462,100
+Prompt2Peptide,basic_nuclear_localization,0.11,0.2727272727272727,1.0,0.6806796610567711,100
+Single-Phase SA,cationic_amphipathic_helix,0.95,0.5578947368421052,1.0,0.7367459235474247,100
+Single-Phase SA,soluble_acidic_loop,0.95,0.5894736842105263,1.0,0.7805832784324355,100
+Single-Phase SA,hydrophobic_beta_sheet,0.95,0.6421052631578947,1.0,0.765551150929323,100
+Single-Phase SA,polar_flexible_linker,0.93,0.6236559139784946,1.0,0.7779438506142351,100
+Single-Phase SA,basic_nuclear_localization,0.0,0.0,1.0,0.7860116591358031,100
+Random GA,cationic_amphipathic_helix,0.96,0.6458333333333334,1.0,0.721192040854973,100
+Random GA,soluble_acidic_loop,0.97,0.6391752577319587,1.0,0.747970882973545,100
+Random GA,hydrophobic_beta_sheet,0.96,0.65625,1.0,0.7548090964935685,100
+Random GA,polar_flexible_linker,0.99,0.696969696969697,1.0,0.7762862696030892,100
+Random GA,basic_nuclear_localization,0.4,0.7,0.99,0.6819763067361531,100
+Random+Filter,cationic_amphipathic_helix,0.94,0.648936170212766,1.0,0.7316249504858486,100
+Random+Filter,soluble_acidic_loop,0.68,0.5441176470588235,1.0,0.7421436981238223,100
+Random+Filter,hydrophobic_beta_sheet,0.97,0.5876288659793815,1.0,0.7579585992764342,100
+Random+Filter,polar_flexible_linker,1.0,0.65,1.0,0.7727218078252331,100
+Random+Filter,basic_nuclear_localization,0.03,0.6666666666666666,1.0,0.7001874568603631,100
+No Curriculum,cationic_amphipathic_helix,0.91,0.6043956043956044,1.0,0.7305388228423477,100
+No Curriculum,soluble_acidic_loop,0.92,0.5760869565217391,1.0,0.7757852344769824,100
+No Curriculum,hydrophobic_beta_sheet,0.9,0.6666666666666666,1.0,0.7682099507118141,100
+No Curriculum,polar_flexible_linker,0.94,0.6063829787234043,1.0,0.7833223038767252,100
+No Curriculum,basic_nuclear_localization,0.27,0.6296296296296297,1.0,0.6852618717947916,100
+Charge-Only,cationic_amphipathic_helix,0.84,0.6309523809523809,1.0,0.7243781910029432,100
+Charge-Only,soluble_acidic_loop,0.95,0.7157894736842105,1.0,0.7801588364509394,100
+Charge-Only,hydrophobic_beta_sheet,0.97,0.5979381443298969,1.0,0.7674433693947448,100
+Charge-Only,polar_flexible_linker,0.9,0.7333333333333333,1.0,0.7844495863111904,100
+Charge-Only,basic_nuclear_localization,0.14,0.35714285714285715,1.0,0.6646695824396507,100

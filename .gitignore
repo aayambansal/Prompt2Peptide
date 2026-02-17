@@ -38,8 +38,7 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Data files
-*.csv
+# Large binary data
 *.pkl
 *.pickle
 *.h5
@@ -61,8 +60,21 @@ models/
 *.pt
 *.pth
 
-# Results (keep structure but not large files)
-results/*.csv
-results/*.pkl
-data/*.csv
-data/*.pkl
+# ACM template reference (local only, not tracked)
+acmart-primary/
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.out
+comment.cut
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
